@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Build script for WallpaperChanger
+# Build script for MacPaper
 
 # Set colors for output
 GREEN='\033[0;32m'
@@ -8,7 +8,7 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${YELLOW}Building WallpaperChanger...${NC}"
+echo -e "${YELLOW}Building MacPaper...${NC}"
 
 # Check if Swift is installed
 if ! command -v swift &> /dev/null; then
@@ -26,22 +26,22 @@ swift build -c release
 
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}Build successful!${NC}"
-    
+
     # Copy the executable to a more accessible location
-    cp .build/release/WallpaperChanger ./WallpaperChanger
-    
-    echo -e "${GREEN}Executable copied to ./WallpaperChanger${NC}"
+    cp .build/release/MacPaper ./MacPaper
+
+    echo -e "${GREEN}Executable copied to ./MacPaper${NC}"
     echo -e "${YELLOW}You can run the application with:${NC}"
-    echo -e "${GREEN}./WallpaperChanger${NC}"
-    
+    echo -e "${GREEN}./MacPaper${NC}"
+
     # Only ask to run the application if not in CI environment
     if [ -z "$CI" ]; then
         echo -e "${YELLOW}Do you want to run the application now? (y/n)${NC}"
         read -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            echo -e "${YELLOW}Running WallpaperChanger...${NC}"
-            ./WallpaperChanger
+            echo -e "${YELLOW}Running MacPaper...${NC}"
+            ./MacPaper
         fi
     fi
 else

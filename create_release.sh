@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to automate the release process for WallpaperChanger
+# Script to automate the release process for MacPaper
 
 # Set colors for output
 GREEN='\033[0;32m'

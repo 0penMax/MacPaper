@@ -1,54 +1,54 @@
 name: Build and Release
 
 on:
-    push:
-        branches: [main]
-        tags:
-            - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
+  push:
+    branches: [main]
+    tags:
+      - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
 
 jobs:
-    build:
-        runs-on: macos-latest
+  build:
+    runs-on: macos-latest
 
-        steps:
-            - name: Checkout repository
-              uses: actions/checkout@v4
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-            - name: Build application
-              run: |
-                  chmod +x ./build_app.sh
-                  # Modify the script to work non-interactively in CI
-                  sed -i '' 's/read -n 1 -r/echo "n"/g' ./build_app.sh
-                  ./build_app.sh
-              env:
-                  CI: true
+      - name: Build application
+        run: |
+          chmod +x ./build_app.sh
+          # Modify the script to work non-interactively in CI
+          sed -i '' 's/read -n 1 -r/echo "n"/g' ./build_app.sh
+          ./build_app.sh
+        env:
+          CI: true
 
-            - name: Zip application
-              run: |
-                  cd build
-                  zip -r WallpaperChanger.zip WallpaperChanger.app
+      - name: Zip application
+        run: |
+          cd build
+          zip -r MacPaper.zip MacPaper.app
 
-            - name: Upload build artifact
-              uses: actions/upload-artifact@v4
-              with:
-                  name: WallpaperChanger
-                  path: build/WallpaperChanger.zip
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MacPaper
+          path: build/MacPaper.zip
 
-    release:
-        needs: build
-        if: startsWith(github.ref, 'refs/tags/')
-        runs-on: ubuntu-latest
-        permissions:
-            contents: write
-            packages: write
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
 
-        steps:
-            - name: Download build artifact
-              uses: actions/download-artifact@v4
-              with:
-                  name: WallpaperChanger
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: MacPaper
 
-            - name: Release
-              uses: softprops/action-gh-release@v2
-              with:
-                  files: WallpaperChanger.zip
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: MacPaper.zip

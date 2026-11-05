@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Build script for WallpaperChanger.app
+# Build script for MacPaper.app
 
 # Set colors for output
 GREEN='\033[0;32m'
@@ -8,7 +8,7 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${YELLOW}Building WallpaperChanger.app...${NC}"
+echo -e "${YELLOW}Building MacPaper.app...${NC}"
 
 # Check if Swift is installed
 if ! command -v swift &> /dev/null; then
@@ -18,19 +18,19 @@ if ! command -v swift &> /dev/null; then
 fi
 
 # App name and bundle identifier
-APP_NAME="WallpaperChanger"
-BUNDLE_ID="software.bunch.WallpaperChanger"
+APP_NAME="MacPaper"
+BUNDLE_ID="software.bunch.MacPaper"
 
 # Build the application in release mode
 echo -e "${YELLOW}Compiling...${NC}"
-swift build -c release
 
-if [ $? -ne 0 ]; then
+if ! swift build -c release; then
     echo -e "${RED}Build failed.${NC}"
     exit 1
 fi
 
 echo -e "${GREEN}Build successful!${NC}"
+
 
 # Create app bundle structure
 echo -e "${YELLOW}Creating app bundle...${NC}"
@@ -70,7 +70,7 @@ mkdir -p "${ICONSET_DIR}"
 for size in 16 32 64 128 256 512; do
     # Standard resolution
     sips -z $size $size "${ICON_PATH}" --out "${ICONSET_DIR}/icon_${size}x${size}.png" > /dev/null 2>&1
-    
+
     # High resolution (2x)
     sips -z $(($size*2)) $(($size*2)) "${ICON_PATH}" --out "${ICONSET_DIR}/icon_${size}x${size}@2x.png" > /dev/null 2>&1
 done

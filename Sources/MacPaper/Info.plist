@@ -5,13 +5,13 @@
 	<key>CFBundleDisplayName</key>
 	<string>Wallpaper Changer</string>
 	<key>CFBundleExecutable</key>
-	<string>WallpaperChanger</string>
+	<string>MacPaper</string>
 	<key>CFBundleIconFile</key>
 	<string>appicon</string>
 	<key>CFBundleIdentifier</key>
-	<string>software.bunch.WallpaperChanger</string>
+	<string>software.bunch.MacPaper</string>
 	<key>CFBundleName</key>
-	<string>WallpaperChanger</string>
+	<string>MacPaper</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

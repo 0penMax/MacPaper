@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script to build, sign, and submit WallpaperChanger.app to the App Store
+# Script to build, sign, and submit MacPaper.app to the App Store
 #
 # Usage:
 #   ./appstore_release.sh             # Build, sign, and increment version number
@@ -12,7 +12,7 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-echo -e "${YELLOW}=== WallpaperChanger App Store Submission Script ===${NC}"
+echo -e "${YELLOW}=== MacPaper App Store Submission Script ===${NC}"
 
 # Parse command line arguments
 INCREMENT_VERSION=false
@@ -26,9 +26,9 @@ for arg in "$@"; do
 done
 
 # App details
-APP_NAME="WallpaperChanger"
+APP_NAME="MacPaper"
 APP_BUNDLE="./build/${APP_NAME}.app"
-BUNDLE_ID="software.bunch.WallpaperChanger"  # Should match Info.plist
+BUNDLE_ID="software.bunch.MacPaper"  # Should match Info.plist
 INFO_PLIST="Sources/${APP_NAME}/Info.plist"
 
 # Extract current version
@@ -38,7 +38,7 @@ echo -e "${YELLOW}Current version: $CURRENT_VERSION${NC}"
 # Conditionally increment version number
 if [ "$INCREMENT_VERSION" = true ]; then
     echo -e "${YELLOW}Incrementing version number...${NC}"
-    
+
     # Parse version components
     IFS='.' read -r -a VERSION_PARTS <<< "$CURRENT_VERSION"
     MAJOR=${VERSION_PARTS[0]}

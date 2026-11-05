@@ -24,10 +24,10 @@ This project was an example trying to build a simple "vibe coded" application.
 
 ### Option 2: Download Release from GitHub
 
-1. Download the latest release from the [Releases page](https://github.com/bunchsoft/WallpaperChanger/releases)
+1. Download the latest release from the [Releases page](https://github.com/bunchsoft/MacPaper/releases)
 2. Extract the zip file
-3. Move WallpaperChanger.app to your Applications folder
-4. Run `xattr -d com.apple.quarantine /Applications/WallpaperChanger.app` in Terminal
+3. Move MacPaper.app to your Applications folder
+4. Run `xattr -d com.apple.quarantine /Applications/MacPaper.app` in Terminal
 5. Launch the application
 
 ### Option 3: Build from Source
@@ -39,20 +39,20 @@ This project was an example trying to build a simple "vibe coded" application.
     #### Option A: Build as Command Line Tool
 
     ```
-    cd WallpaperChanger
+    cd MacPaper
     ./build.sh
     ```
 
-    The built application will be in the project directory as `WallpaperChanger`
+    The built application will be in the project directory as `MacPaper`
 
     #### Option B: Build as macOS App Bundle
 
     ```
-    cd WallpaperChanger
+    cd MacPaper
     ./build_app.sh
     ```
 
-    The built application will be in `build/WallpaperChanger.app`
+    The built application will be in `build/MacPaper.app`
 
 4. Copy the application to your Applications folder or run it directly
 
@@ -80,7 +80,7 @@ The easiest way to create a new release is to use the provided script:
 
 Replace `1.0.0` with your desired version number. The script will:
 
-1. Update the version in `Sources/WallpaperChanger/Info.plist`
+1. Update the version in `Sources/MacPaper/Info.plist`
 2. Commit the changes
 3. Create and push a tag (e.g., `v1.0.0`)
 4. GitHub Actions will automatically build and publish the release
@@ -89,7 +89,7 @@ Replace `1.0.0` with your desired version number. The script will:
 
 If you prefer to create a release manually:
 
-1. Update the version in `Sources/WallpaperChanger/Info.plist`
+1. Update the version in `Sources/MacPaper/Info.plist`
 2. Commit your changes to the `main` branch
 3. Create and push a new tag:
     ```
