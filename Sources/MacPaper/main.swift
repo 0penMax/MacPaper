@@ -482,7 +482,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(newHash, forKey: kLastWallpaperHashKey)
 
         // Set as desktop wallpaper
-        try NSWorkspace.shared.setDesktopImageURL(tempFileURL, for: NSScreen.main!, options: [:])
+        for screen in NSScreen.screens {
+            do {
+                try NSWorkspace.shared.setDesktopImageURL(
+                    tempFileURL,
+                    for: screen,
+                    options: [:]
+                )
+            } catch {
+                NSLog("Could not set wallpaper: \(error)")
+            }
+        }
+        //try NSWorkspace.shared.setDesktopImageURL(tempFileURL, for: NSScreen.main!, options: [:])
 
         // Show notification if wallpaper has changed (and it's not the first run)
         if wallpaperChanged && UserDefaults.standard.object(forKey: kLastWallpaperHashKey) != nil {
