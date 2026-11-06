@@ -21,7 +21,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // Configuration
     var refreshInterval: TimeInterval = 3600  // Default: 1 hour
-    var currentSource: WallpaperSource = .picsum
+    var currentSource: WallpaperSource = .bing
 
     // Cache for last resolved image URL
     private var lastResolvedImageUrl: String?
@@ -167,8 +167,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         intervalItem.submenu = intervalMenu
         menu.addItem(intervalItem)
 
+
         // Source submenu
         let sourceMenu = NSMenu()
+
+        let bingItem = NSMenuItem(
+            title: "Bing - picture of the day", action: #selector(setSource(_:)),
+            keyEquivalent: "")
+        bingItem.representedObject = WallpaperSource.bing
+        if case .bing = currentSource {
+            bingItem.state = .on
+        }
+        sourceMenu.addItem(bingItem)
+
 
         let picsumItem = NSMenuItem(
             title: "Random (from picsum.photos)", action: #selector(setSource(_:)),
@@ -383,6 +394,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func getImageUrl() async throws -> URL {
         switch currentSource {
+        case .bing:
+            return URL(string: "https://www.bing.com/th?id=OHR.StileCrossing_ROW6996983847_UHD.jpg")!
+
         case .picsum:
             // Get screen size for appropriate image dimensions
             let screenSize = NSScreen.main?.frame.size ?? NSSize(width: 1920, height: 1080)
@@ -710,6 +724,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 // MARK: - Supporting Types
 
 enum WallpaperSource {
+    case bing
     case picsum
     case staticUrl(String)
     case jsonApi(String, String)  // URL and JSON path
@@ -829,6 +844,8 @@ extension AppDelegate {
             defaults.set(2, forKey: kSourceTypeKey)
             defaults.set(url, forKey: kJsonApiUrlKey)
             defaults.set(selector, forKey: kJsonSelectorKey)
+        case .bing:
+            defaults.set(3, forKey: kSourceTypeKey)
         }
 
         // Save last resolved image URL
@@ -872,6 +889,8 @@ extension AppDelegate {
                 {
                     currentSource = .jsonApi(url, selector)
                 }
+            case 3:
+                currentSource = .bing
             default:
                 break
             }
