@@ -43,7 +43,7 @@ jobs:
       contents: write
 
     env:
-      VERSION: ${{ github.run_number }}
+      VERSION: ${{ github.ref_name }}
 
     steps:
       - name: Checkout repository
@@ -62,10 +62,10 @@ jobs:
         run: |
           if previous_tag=$(git describe --tags --abbrev=0 "$GITHUB_SHA^" 2>/dev/null); then
             commit_range="${previous_tag}..${GITHUB_SHA}"
-            changelog_url="https://github.com/${GITHUB_REPOSITORY}/compare/${previous_tag}...v${VERSION}"
+            changelog_url="https://github.com/${GITHUB_REPOSITORY}/compare/${previous_tag}...${VERSION}"
           else
             commit_range="$GITHUB_SHA"
-            changelog_url="https://github.com/${GITHUB_REPOSITORY}/commits/v${VERSION}"
+            changelog_url="https://github.com/${GITHUB_REPOSITORY}/commits/${VERSION}"
           fi
 
           {
@@ -80,8 +80,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v${VERSION}" release-artifacts/MacPaper.zip \
+          gh release create "${VERSION}" release-artifacts/MacPaper.zip \
             --target "$GITHUB_SHA" \
-            --title "MacPaper v${VERSION}" \
+            --title "MacPaper ${VERSION}" \
             --notes-file release-notes.md
-
