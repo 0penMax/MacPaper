@@ -505,6 +505,54 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private var spaceObserver: NSObjectProtocol?
+
+    override init() {
+        super.init()
+
+            spaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
+                forName: NSWorkspace.activeSpaceDidChangeNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                // Let macOS finish activating the new Space before setting its wallpaper.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    self?.applyToCurrentSpace()
+                }
+            }
+
+            applyToCurrentSpace()
+    }
+
+    private func setDesktopImage(url: URL) {
+            do {
+                if let screen = NSScreen.main {
+                    try NSWorkspace.shared.setDesktopImageURL(url, for: screen, options: [:])
+                }
+            } catch {
+                print(error)
+            }
+        }
+
+        private func applyToCurrentSpace() {
+            guard let imageURL = currentWallpaperPath else {
+                    NSLog("No downloaded wallpaper is available yet.")
+                    return
+                }
+            guard FileManager.default.isReadableFile(atPath: imageURL.path) else {
+                NSLog("Wallpaper image is missing or unreadable: \(imageURL.path)")
+                return
+            }
+
+            self.setDesktopImage(url:imageURL)
+        }
+
+        deinit {
+            if let spaceObserver {
+                NSWorkspace.shared.notificationCenter.removeObserver(spaceObserver)
+            }
+        }
+
     @objc func saveCurrentWallpaper() {
         guard let currentWallpaperPath = currentWallpaperPath else {
             // Show an alert if there's no current wallpaper
