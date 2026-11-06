@@ -114,6 +114,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupMenuBar()
         if refreshInterval != 0 {
              startTimer()
+             }else{
+             scheduleNextRun(st: refreshTimeEveryDay)
         }
 
     }
