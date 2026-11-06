@@ -20,6 +20,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var timer: Timer?
 
     // Configuration
+    var refreshTimeEveryDay: Date = Date.now
     var refreshInterval: TimeInterval = 3600  // Default: 1 hour
     var currentSource: WallpaperSource = .bing
 
@@ -37,6 +38,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var showMessagesEnabled = false
 
     // UserDefaults keys
+    private let kRefreshTimeEveryDayKey = "refreshTimeEveryDay"
     private let kRefreshIntervalKey = "refreshInterval"
     private let kSourceTypeKey = "sourceType"
     private let kStaticUrlKey = "staticUrl"
@@ -110,7 +112,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         loadSettings()
         setupMenuBar()
-        startTimer()
+        if refreshInterval != 0 {
+             startTimer()
+        }
+
     }
 
     func setupMenuBar() {
@@ -140,6 +145,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "HH:mm"
+
         // Interval submenu
         let intervalMenu = NSMenu()
         for (title, seconds) in [
@@ -153,6 +163,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             ("6 hours", 21600.0),
             ("12 hours", 43200.0),
             ("24 hours", 86400.0),
+            ("Every day at:" + formatter.string(from: self.refreshTimeEveryDay), 0)
         ] {
             let item = NSMenuItem(
                 title: title, action: #selector(setInterval(_:)), keyEquivalent: "")
@@ -234,6 +245,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.menu = menu
     }
 
+    private func scheduleNextRun(st: Date) {
+        stopTimer()
+            var time = DateComponents()
+            time.hour = Calendar.current.component(.hour, from: st)
+            time.minute = Calendar.current.component(.minute, from: st)
+            time.second = 0
+
+            guard let nextRun = Calendar.current.nextDate(
+                after: Date(),
+                matching: time,
+                matchingPolicy: .nextTime
+            ) else { return }
+
+            timer = Timer(fire: nextRun, interval: 0, repeats: false) { [weak self] _ in
+                guard let self else { return }
+                self.refreshWallpaper()
+                self.scheduleNextRun(st: st)
+            }
+
+            if let timer {
+                RunLoop.main.add(timer, forMode: .common)
+            }
+        }
+
     func startTimer() {
         stopTimer()
 
@@ -309,10 +344,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func setInterval(_ sender: NSMenuItem) {
         guard let seconds = sender.representedObject as? TimeInterval else { return }
+        if seconds == 0 {
+            viewRefreshTimePicker()
+        }
 
         refreshInterval = seconds
         saveSettings()
-        startTimer()
+        if seconds != 0 {
+            startTimer()
+            }else{
+            scheduleNextRun(st:self.refreshTimeEveryDay)
+        }
         setupMenu()  // Refresh menu to update checkmarks
     }
 
@@ -323,6 +365,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         saveSettings()
         setupMenu()  // Refresh menu to update checkmarks
         refreshWallpaper()
+    }
+
+    @objc func viewRefreshTimePicker() {
+        let alert = NSAlert()
+            alert.messageText = "Enter the time"
+            alert.informativeText = "Choose when to refresh the wallpaper each day."
+
+            let picker = NSDatePicker(frame: NSRect(x: 0, y: 0, width: 100, height: 28))
+            picker.datePickerElements = .hourMinute
+            picker.datePickerStyle = .textFieldAndStepper
+            picker.dateValue = refreshTimeEveryDay  // existing saved Date
+
+            alert.accessoryView = picker
+            alert.addButton(withTitle: "OK")
+            alert.addButton(withTitle: "Cancel")
+
+            if alert.runModal() == .alertFirstButtonReturn {
+                refreshTimeEveryDay = picker.dateValue
+                saveSettings()
+                setupMenu()
+                refreshWallpaper()
+            }
     }
 
     @objc func setStaticUrl() {
@@ -496,18 +560,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(newHash, forKey: kLastWallpaperHashKey)
 
         // Set as desktop wallpaper
-        for screen in NSScreen.screens {
-            do {
-                try NSWorkspace.shared.setDesktopImageURL(
-                    tempFileURL,
-                    for: screen,
-                    options: [:]
-                )
-            } catch {
-                NSLog("Could not set wallpaper: \(error)")
-            }
-        }
-        //try NSWorkspace.shared.setDesktopImageURL(tempFileURL, for: NSScreen.main!, options: [:])
+        setDesktopImage(url: tempFileURL)
 
         // Show notification if wallpaper has changed (and it's not the first run)
         if wallpaperChanged && UserDefaults.standard.object(forKey: kLastWallpaperHashKey) != nil {
@@ -832,6 +885,7 @@ extension AppDelegate {
 
         // Save refresh interval
         defaults.set(refreshInterval, forKey: kRefreshIntervalKey)
+        defaults.set(refreshTimeEveryDay, forKey: kRefreshTimeEveryDayKey)
 
         // Save source type and related data
         switch currentSource {
@@ -863,6 +917,7 @@ extension AppDelegate {
         // Load refresh interval
         if defaults.object(forKey: kRefreshIntervalKey) != nil {
             refreshInterval = defaults.double(forKey: kRefreshIntervalKey)
+            refreshTimeEveryDay = defaults.object(forKey: kRefreshTimeEveryDayKey) as? Date ?? .now
         }
 
         // Check if we need to register for login
