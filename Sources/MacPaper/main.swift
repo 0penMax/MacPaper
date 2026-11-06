@@ -288,6 +288,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         timer = nil
     }
 
+
+    private struct BingImageResponse: Decodable {
+        let images: [Image]
+
+        struct Image: Decodable {
+            let urlbase: String
+        }
+    }
+
+    func fetchBingUHDImageURL() async throws -> URL {
+        let endpoint = URL(string:
+            "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=en-xl"
+        )!
+
+        let (data, _) = try await URLSession.shared.data(from: endpoint)
+        let response = try JSONDecoder().decode(BingImageResponse.self, from: data)
+
+        guard let urlbase = response.images.first?.urlbase,
+              let imageURL = URL(string: "https://www.bing.com\(urlbase)_UHD.jpg") else {
+            throw URLError(.badServerResponse)
+        }
+
+        return imageURL
+    }
+
     @objc func refreshWallpaper() {
         Task {
             do {
@@ -459,7 +484,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func getImageUrl() async throws -> URL {
         switch currentSource {
         case .bing:
-            return URL(string: "https://www.bing.com/th?id=OHR.StileCrossing_ROW6996983847_UHD.jpg")!
+            return try await fetchBingUHDImageURL()
 
         case .picsum:
             // Get screen size for appropriate image dimensions
