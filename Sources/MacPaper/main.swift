@@ -36,6 +36,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Flags to track notification status
     private var notificationsAuthorized = false
     private var showMessagesEnabled = false
+    private var dailyRefreshInProgress = false
+    private var wakeObserver: NSObjectProtocol?
 
     // UserDefaults keys
     private let kRefreshTimeEveryDayKey = "refreshTimeEveryDay"
@@ -46,6 +48,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let kJsonSelectorKey = "jsonSelector"
     private let kLastResolvedImageUrlKey = "lastResolvedImageUrl"
     private let kLastWallpaperHashKey = "lastWallpaperHash"
+    private let kLastDailyRefreshDateKey = "lastDailyRefreshDate"
     private let kRunAtLoginKey = "runAtLogin"
     private let kShowMessagesEnabledKey = "showMessagesEnabled"
 
@@ -113,9 +116,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         loadSettings()
         setupMenuBar()
         if refreshInterval != 0 {
-             startTimer()
-             }else{
-             scheduleNextRun(st: refreshTimeEveryDay)
+            startTimer()
+        } else {
+            scheduleNextRun(st: refreshTimeEveryDay)
+            refreshMissedDailyWallpaperIfNeeded()
+        }
+
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            // NSTimer does not run while the Mac is asleep. Catch up after waking.
+            self?.refreshMissedDailyWallpaperIfNeeded()
         }
 
     }
@@ -249,26 +262,60 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func scheduleNextRun(st: Date) {
         stopTimer()
-            var time = DateComponents()
-            time.hour = Calendar.current.component(.hour, from: st)
-            time.minute = Calendar.current.component(.minute, from: st)
-            time.second = 0
+        var time = DateComponents()
+        time.hour = Calendar.current.component(.hour, from: st)
+        time.minute = Calendar.current.component(.minute, from: st)
+        time.second = 0
 
-            guard let nextRun = Calendar.current.nextDate(
-                after: Date(),
-                matching: time,
-                matchingPolicy: .nextTime
-            ) else { return }
+        guard let nextRun = Calendar.current.nextDate(
+            after: Date(),
+            matching: time,
+            matchingPolicy: .nextTime
+        ) else { return }
 
-            timer = Timer(fire: nextRun, interval: 0, repeats: false) { [weak self] _ in
-                guard let self else { return }
-                self.refreshWallpaper()
-                self.scheduleNextRun(st: st)
+        timer = Timer(fire: nextRun, interval: 0, repeats: false) { [weak self] _ in
+            guard let self else { return }
+            self.scheduleNextRun(st: st)
+            self.refreshMissedDailyWallpaperIfNeeded()
+        }
+
+        if let timer {
+            RunLoop.main.add(timer, forMode: .common)
+        }
+    }
+
+    private func refreshMissedDailyWallpaperIfNeeded() {
+        guard refreshInterval == 0, !dailyRefreshInProgress,
+              let scheduledTimeToday = scheduledTimeToday(),
+              Date() >= scheduledTimeToday,
+              !hasRefreshedDailyWallpaperToday()
+        else { return }
+
+        dailyRefreshInProgress = true
+        Task { [weak self] in
+            guard let self else { return }
+            let refreshed = await self.performWallpaperRefresh()
+            if refreshed {
+                UserDefaults.standard.set(Date(), forKey: self.kLastDailyRefreshDateKey)
             }
+            self.dailyRefreshInProgress = false
+        }
+    }
 
-            if let timer {
-                RunLoop.main.add(timer, forMode: .common)
-            }
+    private func scheduledTimeToday() -> Date? {
+        let calendar = Calendar.current
+        var components = calendar.dateComponents([.year, .month, .day], from: Date())
+        components.hour = calendar.component(.hour, from: refreshTimeEveryDay)
+        components.minute = calendar.component(.minute, from: refreshTimeEveryDay)
+        components.second = 0
+        return calendar.date(from: components)
+    }
+
+    private func hasRefreshedDailyWallpaperToday() -> Bool {
+        guard let lastRefresh = UserDefaults.standard.object(forKey: kLastDailyRefreshDateKey) as? Date else {
+            return false
+        }
+        return Calendar.current.isDate(lastRefresh, inSameDayAs: Date())
         }
 
     func startTimer() {
@@ -317,55 +364,61 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func refreshWallpaper() {
         Task {
-            do {
-                let imageUrl = try await getImageUrl()
-                let urlString = imageUrl.absoluteString
+            _ = await performWallpaperRefresh()
+        }
+    }
 
-                // Check if the URL has changed since last time
-                if urlString == lastResolvedImageUrl {
-                    // Skip for JSON API source only if the URL is unchanged
-                    if case .jsonApi = currentSource {
-                        print("Image URL unchanged, skipping download")
-                        return
-                    }
-                }
+    private func performWallpaperRefresh() async -> Bool {
+        do {
+            let imageUrl = try await getImageUrl()
+            let urlString = imageUrl.absoluteString
 
-                // Update the last resolved URL
-                lastResolvedImageUrl = urlString
-                saveSettings()
-
-                try await downloadAndSetWallpaper(from: imageUrl)
-            } catch {
-                print("Error refreshing wallpaper: \(error)")
-
-                // Show alert with detailed error information
-                await MainActor.run {
-                    let alert = NSAlert()
-                    alert.alertStyle = .warning
-                    alert.icon = NSImage(
-                        systemSymbolName: "exclamationmark.triangle",
-                        accessibilityDescription: "Error")
-                    alert.messageText = "Wallpaper Error"
-                    alert.informativeText = "Failed to update wallpaper. See below for details."
-
-                    // Add detailed error information
-                    let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 450, height: 200))
-                    textView.isEditable = false
-                    textView.string = error.localizedDescription
-
-                    let scrollView = NSScrollView(
-                        frame: NSRect(x: 0, y: 0, width: 450, height: 200))
-                    scrollView.documentView = textView
-                    scrollView.hasVerticalScroller = true
-                    scrollView.hasHorizontalScroller = true
-                    scrollView.autohidesScrollers = true
-
-                    alert.accessoryView = scrollView
-                    alert.addButton(withTitle: "OK")
-
-                    alert.runModal()
+            // Check if the URL has changed since last time
+            if urlString == lastResolvedImageUrl {
+                // Skip for JSON API source only if the URL is unchanged
+                if case .jsonApi = currentSource {
+                    print("Image URL unchanged, skipping download")
+                    return true
                 }
             }
+
+            // Update the last resolved URL
+            lastResolvedImageUrl = urlString
+            saveSettings()
+
+            try await downloadAndSetWallpaper(from: imageUrl)
+            return true
+        } catch {
+            print("Error refreshing wallpaper: \(error)")
+
+            // Show alert with detailed error information
+            await MainActor.run {
+                let alert = NSAlert()
+                alert.alertStyle = .warning
+                alert.icon = NSImage(
+                    systemSymbolName: "exclamationmark.triangle",
+                    accessibilityDescription: "Error")
+                alert.messageText = "Wallpaper Error"
+                alert.informativeText = "Failed to update wallpaper. See below for details."
+
+                // Add detailed error information
+                let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 450, height: 200))
+                textView.isEditable = false
+                textView.string = error.localizedDescription
+
+                let scrollView = NSScrollView(
+                    frame: NSRect(x: 0, y: 0, width: 450, height: 200))
+                scrollView.documentView = textView
+                scrollView.hasVerticalScroller = true
+                scrollView.hasHorizontalScroller = true
+                scrollView.autohidesScrollers = true
+
+                alert.accessoryView = scrollView
+                alert.addButton(withTitle: "OK")
+
+                alert.runModal()
+            }
+            return false
         }
     }
 
@@ -645,6 +698,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if let spaceObserver {
                 NSWorkspace.shared.notificationCenter.removeObserver(spaceObserver)
             }
+        if let wakeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
+        }
         }
 
     @objc func saveCurrentWallpaper() {
