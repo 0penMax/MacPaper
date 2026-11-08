@@ -127,8 +127,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            // NSTimer does not run while the Mac is asleep. Catch up after waking.
-            self?.refreshMissedDailyWallpaperIfNeeded()
+            self?.handleSystemWake()
         }
 
     }
@@ -300,6 +299,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             self.dailyRefreshInProgress = false
         }
+    }
+
+    private func handleSystemWake() {
+        guard refreshInterval == 0 else { return }
+
+        // The timer from before sleep may be overdue, so replace it with tomorrow's run
+        // before catching up on today's missed update.
+        scheduleNextRun(st: refreshTimeEveryDay)
+        refreshMissedDailyWallpaperIfNeeded()
     }
 
     private func scheduledTimeToday() -> Date? {
