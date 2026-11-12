@@ -378,7 +378,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             "https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=en-xl"
         )!
 
-        let (data, _) = try await URLSession.shared.data(from: endpoint)
+        let (data, _) = try await requestData(from: endpoint)
         let response = try JSONDecoder().decode(BingImageResponse.self, from: data)
 
         guard let urlbase = response.images.first?.urlbase,
@@ -586,7 +586,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 throw WallpaperError.invalidImageUrl(urlString: apiUrlString)
             }
 
-            let (data, _) = try await URLSession.shared.data(from: apiUrl)
+            let (data, _) = try await requestData(from: apiUrl)
 
             guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
                 throw WallpaperError.invalidJsonResponse
@@ -627,14 +627,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func downloadAndSetWallpaper(from url: URL) async throws {
-        let (data, response) = try await URLSession.shared.data(from: url)
-
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-            throw WallpaperError.downloadFailed
-        }
+        let (data, httpResponse) = try await requestData(from: url)
 
         guard let image = NSImage(data: data) else {
-            throw WallpaperError.invalidImageData
+            throw WallpaperError.invalidImageData(
+                url: httpResponse.url?.absoluteString ?? url.absoluteString,
+                contentType: httpResponse.value(forHTTPHeaderField: "Content-Type")
+            )
         }
 
         // Save image to temporary file
@@ -677,6 +676,48 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     message: "Wallpaper has been updated", title: "Wallpaper Changed")
             }
         }
+    }
+
+    private func requestData(from url: URL) async throws -> (Data, HTTPURLResponse) {
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw WallpaperError.unexpectedResponse(url: url.absoluteString)
+            }
+
+            guard (200...299).contains(httpResponse.statusCode) else {
+                throw WallpaperError.requestFailed(
+                    url: httpResponse.url?.absoluteString ?? url.absoluteString,
+                    statusCode: httpResponse.statusCode,
+                    responsePreview: responsePreview(from: data)
+                )
+            }
+
+            return (data, httpResponse)
+        } catch let error as WallpaperError {
+            throw error
+        } catch let error as URLError {
+            throw WallpaperError.networkRequestFailed(
+                url: url.absoluteString,
+                reason: error.localizedDescription
+            )
+        } catch {
+            throw WallpaperError.networkRequestFailed(
+                url: url.absoluteString,
+                reason: error.localizedDescription
+            )
+        }
+    }
+
+    private func responsePreview(from data: Data) -> String? {
+        guard !data.isEmpty else { return nil }
+
+        let preview = String(decoding: data.prefix(300), as: UTF8.self)
+            .components(separatedBy: .newlines)
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return preview.isEmpty ? nil : preview
     }
 
     private var spaceObserver: NSObjectProtocol?
@@ -898,8 +939,10 @@ enum WallpaperSource {
 
 enum WallpaperError: Error, LocalizedError {
     case invalidUrl
-    case downloadFailed
-    case invalidImageData
+    case requestFailed(url: String, statusCode: Int, responsePreview: String?)
+    case networkRequestFailed(url: String, reason: String)
+    case unexpectedResponse(url: String)
+    case invalidImageData(url: String, contentType: String?)
     case imageConversionFailed
     case invalidJsonResponse
     case jsonPathNotFound(path: String, json: String)
@@ -909,10 +952,22 @@ enum WallpaperError: Error, LocalizedError {
         switch self {
         case .invalidUrl:
             return "Invalid URL provided"
-        case .downloadFailed:
-            return "Failed to download image"
-        case .invalidImageData:
-            return "Invalid image data received"
+        case .requestFailed(let url, let statusCode, let responsePreview):
+            var message = "Request failed with HTTP \(statusCode) (\(HTTPURLResponse.localizedString(forStatusCode: statusCode))).\nURL: \(url)"
+            if let responsePreview {
+                message += "\nServer response: \(responsePreview)"
+            }
+            return message
+        case .networkRequestFailed(let url, let reason):
+            return "Could not reach the server.\nURL: \(url)\nReason: \(reason)"
+        case .unexpectedResponse(let url):
+            return "The server returned a non-HTTP response.\nURL: \(url)"
+        case .invalidImageData(let url, let contentType):
+            var message = "The server response was not a valid image.\nURL: \(url)"
+            if let contentType {
+                message += "\nContent-Type: \(contentType)"
+            }
+            return message
         case .imageConversionFailed:
             return "Failed to convert image format"
         case .invalidJsonResponse:
