@@ -270,6 +270,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
+        let about = NSMenuItem(title: "About", action: #selector(showVersionPopup), keyEquivalent: "")
+        menu.addItem(about)
+
         // Quit option
         menu.addItem(
             NSMenuItem(
@@ -494,6 +497,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 setupMenu()
                 refreshWallpaper()
             }
+    }
+
+
+    @objc func showVersionPopup() {
+        let info = Bundle.main.infoDictionary
+        let appName = info?["CFBundleName"] as? String ?? "App"
+        let version = info?["CFBundleShortVersionString"] as? String ?? "Unknown"
+        let build = info?["CFBundleVersion"] as? String ?? "Unknown"
+
+        let alert = NSAlert()
+        alert.messageText = appName
+        alert.informativeText = "Version \(version) (\(build))"
+        alert.alertStyle = .informational
+        alert.icon = NSApp.applicationIconImage
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Source Code")
+
+        // **The second button returns .alertSecondButtonReturn**
+        let response = alert.runModal()
+        if response == .alertSecondButtonReturn,
+           let url = URL(string: "https://github.com/0penMax/MacPaper") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     @objc func setStaticUrl() {
