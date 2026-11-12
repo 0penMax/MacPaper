@@ -38,6 +38,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var showMessagesEnabled = false
     private var dailyRefreshInProgress = false
     private var wakeObserver: NSObjectProtocol?
+    private var screenConfigurationObserver: NSObjectProtocol?
+
+    private var canUseUserNotifications: Bool {
+        Bundle.main.bundleURL.pathExtension.lowercased() == "app"
+    }
 
     // UserDefaults keys
     private let kRefreshTimeEveryDayKey = "refreshTimeEveryDay"
@@ -56,20 +61,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Set as accessory app (menu bar only)
         NSApp.setActivationPolicy(.accessory)
 
-        // Request notification permission
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) {
-            [weak self] granted, error in
-            if let error = error {
-                print("Error requesting notification authorization: \(error.localizedDescription)")
-            }
+        // UserNotifications requires the process to be launched from an app bundle.
+        if canUseUserNotifications {
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) {
+                [weak self] granted, error in
+                if let error = error {
+                    print("Error requesting notification authorization: \(error.localizedDescription)")
+                }
 
-            // Store the authorization status
-            self?.notificationsAuthorized = granted
+                // Store the authorization status
+                self?.notificationsAuthorized = granted
 
-            if granted {
-                print("Notification permission granted")
-            } else {
-                print("Notification permission denied")
+                if granted {
+                    print("Notification permission granted")
+                } else {
+                    print("Notification permission denied")
+                }
             }
         }
 
@@ -128,6 +135,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             queue: .main
         ) { [weak self] _ in
             self?.handleSystemWake()
+        }
+
+        screenConfigurationObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            // A display may not be available while asleep. Apply the cached wallpaper
+            // when macOS reports that it has returned or been connected.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                self?.applyToCurrentSpace()
+            }
         }
 
     }
@@ -680,14 +699,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func setDesktopImage(url: URL) {
+        for screen in NSScreen.screens {
             do {
-                if let screen = NSScreen.main {
-                    try NSWorkspace.shared.setDesktopImageURL(url, for: screen, options: [:])
-                }
+                try NSWorkspace.shared.setDesktopImageURL(url, for: screen, options: [:])
             } catch {
-                print(error)
+                print("Failed to set wallpaper for \(screen.localizedName): \(error)")
             }
         }
+    }
 
         private func applyToCurrentSpace() {
             guard let imageURL = currentWallpaperPath else {
@@ -708,6 +727,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         if let wakeObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
+        }
+        if let screenConfigurationObserver {
+            NotificationCenter.default.removeObserver(screenConfigurationObserver)
         }
         }
 
